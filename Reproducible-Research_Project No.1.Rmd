@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Instrucciones de asignación 
+# Instrucciones
 
 
 
@@ -33,11 +33,12 @@ knitr::opts_chunk$set(echo = TRUE)
 # Librerías utilizadas para el análisis
 
 library(lubridate)
-
+library(ggplot2)
+library(dplyr)
 
 
 ```
-## Paso 1: 
+## Paso 1: Código para lectura y/o procesamiento de información.
 
 
 ```{r}
@@ -45,25 +46,224 @@ library(lubridate)
 # Libera el archivo zip de la actividad
 unzip(zipfile="repdata_data_activity.zip",exdir="./data")
 
+clase <- c("integer", "character", "integer")
 # Lectura de la base de datos 
-DataRR <- read.csv("data/activity.csv")
+Actividad <- read.csv("data/activity.csv", head = TRUE, na.strings = "NA", colClasses = clase)
 
 # Exploración inicial de la base de datos
-dim(DataRR)
+dim(Actividad)
 
-names(DataRR)
+names(Actividad)
 
-str(DataRR)
+str(Actividad)
 
 # Transformación de la variable "date", a fecha.
 
-DataRR$date <- ymd(DataRR$date)
+Actividad$date <- as_date(Actividad$date)
 
 # 
-str(DataRR)
+str(Actividad)
 
 
 ```
 
 
 
+## Paso 2: Histograma del total de números de pasos tomados cada día.
+
+
+
+```{r}
+
+Sumadiaria <- tapply(Actividad$steps, Actividad$date, 
+                     sum, na.rm= TRUE, simplify = T)
+
+
+Sumadiaria <- Sumadiaria[!is.na(Sumadiaria)]
+
+png("Gráfico1.png") dev.off()
+
+hist(x=Sumadiaria,
+     col="blue",
+     breaks=20,
+     xlab="Total de pasos diarios",
+     ylab="Frecuencia",
+     main="Distribución del total de pasos diarios \n (Datos perdidos ignorados)")
+dev.off()
+
+
+hist(x=Sumadiaria,
+     col="blue",
+     breaks=20,
+     xlab="Total de pasos diarios",
+     ylab="Frecuencia",
+     main="Distribución del total de pasos diarios \n (Datos perdidos ignorados)")
+
+
+```
+
+
+
+
+## Paso 3: Media y mediana del número de pasos tomados cáda día.
+
+```{r}
+mean(Sumadiaria)
+```
+
+```{r}
+median(Sumadiaria)
+```
+
+
+
+## Paso 4: Gráfico de serie de tiempo del rango de número de pasos tomados.
+
+```{r}
+
+
+STiempo <- Actividad %>%
+        group_by(date) %>%
+        summarise(RangoPasos = sum(steps, na.rm = TRUE))
+
+dim(STiempo)
+
+head(STiempo)
+
+```
+
+
+```{r}
+png("Gráfico1.png") 
+Gstiempo <- ggplot(STiempo, aes(x=date, y = RangoPasos))+
+        geom_line(col = "blue")
+
+Gstiempo
+
+dev.off()
+
+```
+
+
+
+
+
+
+## Paso 5: Intervalo de 5 minutos que, en promedio, contiene el número máximo de pasos.
+
+
+
+```{r}
+
+IntervaloPasos <- Actividad %>%
+        group_by(interval) %>%
+        summarise(MediaPasos = mean(steps, na.rm = TRUE))
+
+dim(IntervaloPasos)
+
+head(IntervaloPasos)
+
+```
+
+```{r}
+
+
+png("Gráfico1.png") 
+Paso5 <- ggplot(IntervaloPasos, aes(x = interval, y = MediaPasos))+
+        geom_line(col = "blue")
+
+Paso5
+
+dev.off()
+Paso5
+```
+
+
+
+## Paso 6: Código para describir y mostrar una estrategia para imputar los datos faltantes. 
+
+
+```{r}
+print(paste("El total de número de filas con NA, es: ",sum(is.na(Actividad$steps))))
+```
+
+
+
+```{r}
+PasosPorDia <- Actividad %>%
+        group_by(date) %>%
+        summarize(SumaPasos = sum(steps, na.rm = TRUE)) 
+head(PasosPorDia,10)
+```
+
+
+
+
+## Paso 7: Histograma del número total de pasos tomados cada día después de que los valores perdidos fueron imputados. 
+
+
+
+```{r}
+png("Gráfico1.png") 
+
+Hist7 <- ggplot(PasosPorDia, aes(x = SumaPasos))+
+        geom_histogram(na.rm = TRUE)
+
+Hist7
+
+dev.off()
+
+Hist7
+
+```
+
+
+
+## Paso 8: Gráfico de panel que compara el número promedio de pasos dados por intervalo de 5 minutos entre días de semana y fines de semana.
+
+
+```{r}
+
+
+PasosDSemana <- Actividad
+
+PasosDSemana$Dia <- wday(PasosDSemana$date)
+
+
+PasosDSemana <- mutate(Actividad, 
+                       DSemana = factor(PasosDSemana$Dia,
+                                         labels = c("Fin de Semana",
+                                                    "Entre semana",
+                                                    "Entre semana",
+                                                    "Entre semana",
+                                                    "Entre semana",
+                                                    "Entre semana",
+                                                    "Fin de Semana")))
+
+PasosDSemana <- filter(PasosDSemana, PasosDSemana$steps >= 0)
+
+PasosDSemana <- PasosDSemana %>%
+        group_by(interval, DSemana)%>%
+        summarise(steps = mean(steps)) 
+
+
+png("Gráfico1.png") 
+
+GPISemana <- ggplot(PasosDSemana, aes(interval, steps)) +
+        geom_line()
+
+
+GPISemana + facet_grid(DSemana~.)
+
+dev.off()
+
+GPISemana + facet_grid(DSemana~.)
+
+```
+
+
+
+
+
+
+## Paso 9: Todo el código R necesario para producir los resultados (números, gráficos, etc.) en el informe.
